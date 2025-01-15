@@ -29,14 +29,15 @@ app.use(express.static(path.join(__dirname)));
 
 // טיפול בהעלאת קובץ (PDF או תמונה)
 // טיפול בהעלאת קובץ (PDF או תמונה)
+const mammoth = require('mammoth');
 const upload = multer({
     dest: 'uploads/',
     fileFilter: (req, file, cb) => {
         const ext = path.extname(file.originalname).toLowerCase();
-        if (['.pdf', '.jpg', '.jpeg', '.png'].includes(ext)) {
+        if (['.pdf', '.jpg', '.jpeg', '.png', '.doc', '.docx'].includes(ext)) {
             return cb(null, true);
         }
-        cb(new Error('קובץ לא נתמך! רק PDF, JPG, PNG מותרים.'));
+        cb(new Error('קובץ לא נתמך! רק PDF, Word, JPG, PNG מותרים.'));
     }
 });
 
@@ -48,41 +49,51 @@ app.post('/upload', upload.single('file'), async (req, res) => {
 
         const filePath = path.join(__dirname, 'uploads', req.file.filename);
         const ext = path.extname(req.file.originalname).toLowerCase();
+        let fileContent = '';
 
+        // Extract content based on file type
         if (ext === '.pdf') {
-            // ניתוח PDF
             const data = await pdfParse(fs.readFileSync(filePath));
-            fs.unlink(filePath, err => {
-                if (err) console.error('שגיאה במחיקת הקובץ:', err);
-            });
-            return res.json({ answer: `תוכן ה-PDF: ${data.text}` });
+            fileContent = data.text;
+        } else if (['.doc', '.docx'].includes(ext)) {
+            const result = await mammoth.extractRawText({ path: filePath });
+            fileContent = result.value;
         } else if (['.jpg', '.jpeg', '.png'].includes(ext)) {
-            // ניתוח תמונה עם Tesseract.js
-            tesseract.recognize(filePath, 'heb', {
-                logger: info => console.log(info) // אופציונלי: להציג לוגים בתהליך
-            })
-                .then(({ data: { text } }) => {
-                    fs.unlink(filePath, err => {
-                        if (err) console.error('שגיאה במחיקת הקובץ:', err);
-                    });
-                    return res.json({ answer: `תוכן הטקסט מהתמונה: ${text}` });
-                })
-                .catch(error => {
-                    console.error('שגיאה בניתוח התמונה:', error);
-                    fs.unlink(filePath, err => {
-                        if (err) console.error('שגיאה במחיקת הקובץ:', err);
-                    });
-                    return res.status(500).json({ error: 'שגיאה בניתוח התמונה.' });
-                });
-        } else {
-            fs.unlink(filePath, err => {
-                if (err) console.error('שגיאה במחיקת הקובץ:', err);
-            });
-            return res.status(400).json({ error: 'סוג קובץ לא נתמך.' });
+            const { data: { text } } = await tesseract.recognize(filePath, 'heb');
+            fileContent = text;
         }
+
+        // Analyze content with OpenAI
+        const openAiResponse = await openai.chat.completions.create({
+            model: 'gpt-3.5-turbo',
+            messages: [
+                { 
+                    role: 'system', 
+                    content: `${baseKnowledge}\nנתח את המסמך הבא הקשור לדיני תעבורה. התייחס לנקודות חשובות, השלכות משפטיות, והמלצות אם רלוונטי.` 
+                },
+                { 
+                    role: 'user', 
+                    content: fileContent 
+                }
+            ],
+            max_tokens: 1000,
+            temperature: 0.7,
+        });
+
+        // Clean up file
+        fs.unlink(filePath, err => {
+            if (err) console.error('שגיאה במחיקת הקובץ:', err);
+        });
+
+        // Send analysis to client
+        return res.json({ 
+            answer: `ניתוח המסמך:\n${openAiResponse.choices[0].message.content}`,
+            originalText: fileContent 
+        });
+
     } catch (error) {
         console.error('שגיאה כללית:', error);
-        return res.status(500).json({ error: 'שגיאה כללית.' });
+        return res.status(500).json({ error: 'שגיאה בניתוח הקובץ.' });
     }
 });
 

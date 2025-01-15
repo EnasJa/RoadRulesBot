@@ -100,7 +100,28 @@
             animation: slideIn 0.3s ease-out;
             box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
             transition: transform 0.2s ease;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
         }
+        .message-icon {
+            flex-shrink: 0;
+            font-size: 1.2rem;
+            margin-top: 3px;
+}
+.user .message-icon {
+    order: 1; /* Puts icon at the end for user messages */
+    margin-right: 8px;
+}
+
+.bot .message-icon {
+    order: -1; /* Puts icon at the start for bot messages */
+    margin-left: 8px;
+}
+
+.message-content {
+    flex: 1;
+}
 
         @keyframes slideIn {
             from {
@@ -326,34 +347,61 @@
 
         // פונקציה להוספת הודעה למסך
         function addMessage(text, type) {
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${type}`;
-            messageDiv.textContent = `${type === 'user' ? 'אתה: ' : 'בוט: '}${text}`;
-            messagesDiv.appendChild(messageDiv);
-            messagesDiv.scrollTop = messagesDiv.scrollHeight;
-            return messageDiv;
-        }
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${type}`;
+
+    // Create icon element
+    const iconSpan = document.createElement('span');
+    iconSpan.className = 'message-icon';
+    // Use Font Awesome icons that match your theme
+    iconSpan.innerHTML = type === 'user' ? '<i class="fas fa-paper-plane"></i>' : '<i class="fas fa-balance-scale"></i>';
+
+    // Create content element
+    const contentSpan = document.createElement('span');
+    contentSpan.className = 'message-content';
+    contentSpan.textContent = text;
+
+    // Append icon and content to message
+    messageDiv.appendChild(iconSpan);
+    messageDiv.appendChild(contentSpan);
+    
+    messagesDiv.appendChild(messageDiv);
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    return messageDiv;
+}
 
         // פונקציה להעלאת קובץ
         function uploadFile() {
-            const fileInput = document.getElementById('file-input');
-            const file = fileInput.files[0];
+    const fileInput = document.getElementById('file-input');
+    const file = fileInput.files[0];
 
-            if (file) {
-                const formData = new FormData();
-                formData.append('file', file);
+    if (file) {
+        // Show uploading message
+        addMessage(`מעלה קובץ: ${file.name}`, 'user');
+        const loadingMessage = addMessage('מנתח את הקובץ...', 'bot loading');
 
-                // שליחת הקובץ לשרת
-                axios.post('http://localhost:3000/upload', formData)
-                    .then(response => {
-                        // הצגת תשובת הבוט אחרי העלאת הקובץ
-                        addMessage(response.data.answer || 'שגיאה בהעלאת קובץ.', 'bot');
-                    })
-                    .catch(error => {
-                        console.error('שגיאה בהעלאת הקובץ:', error);
-                    });
-            }
-        }
+        const formData = new FormData();
+        formData.append('file', file);
+
+        // Add loading indicator
+        axios.post('http://localhost:3000/upload', formData)
+            .then(response => {
+                loadingMessage.remove();
+                if (response.data.answer) {
+                    addMessage(response.data.answer, 'bot');
+                }
+                // Clear the file input
+                fileInput.value = '';
+            })
+            .catch(error => {
+                loadingMessage.remove();
+                console.error('שגיאה בהעלאת הקובץ:', error);
+                addMessage('שגיאה בהעלאת או בניתוח הקובץ.', 'bot');
+                // Clear the file input
+                fileInput.value = '';
+            });
+    }
+}
 
         // מתודעה שתהיה בעת טעינה
         window.onload = () => {
