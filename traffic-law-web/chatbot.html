@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="he">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>צ'אט דיני תעבורה</title>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+       <style>
+        /* Your existing styles remain the same */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Miriam Libre', serif;
+            direction: rtl;
+            text-align: right;
+            background: linear-gradient(145deg, #1a1a1a, #2a2a2a);
+            padding: 20px;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            color: #ffffff;
+        }
+
+        .container {
+            max-width: 800px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 20px;
+            background: rgba(26, 26, 26, 0.6);
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            color: #ffc107;
+            font-size: 2.5rem;
+            margin-bottom: 30px;
+            text-align: center;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            position: relative;
+            padding-bottom: 15px;
+        }
+
+        h1::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100px;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, #ffc107, transparent);
+        }
+
+        #messages {
+            margin-bottom: 20px;
+            height: 60vh;
+            width: 100%;
+            overflow-y: auto;
+            padding: 20px;
+            background-color: rgba(51, 51, 51, 0.8);
+            border-radius: 16px;
+            box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.2);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            scrollbar-width: thin;
+            scrollbar-color: #ffc107 transparent;
+        }
+
+        #messages::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        #messages::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        #messages::-webkit-scrollbar-thumb {
+            background: #ffc107;
+            border-radius: 3px;
+        }
+
+        .message {
+            margin: 5px 0;
+            padding: 15px 20px;
+            border-radius: 16px;
+            max-width: 75%;
+            word-wrap: break-word;
+            position: relative;
+            animation: slideIn 0.3s ease-out;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .message:hover {
+            transform: translateY(-2px);
+        }
+
+        .user {
+            background: linear-gradient(145deg, #4a4a4a, #3a3a3a);
+            margin-right: auto;
+            color: #ffffff;
+            border-bottom-left-radius: 4px;
+        }
+
+        .bot {
+            background: linear-gradient(145deg, #ffd54f, #ffc107);
+            margin-left: auto;
+            color: #000000;
+            border-bottom-right-radius: 4px;
+        }
+
+        .input-container {
+            display: flex;
+            gap: 10px;
+            width: 100%;
+            padding: 15px;
+            background: #333333;
+            border-radius: 12px;
+            margin-bottom: 15px;
+        }
+
+        #user-input {
+            flex: 1;
+            padding: 15px 20px;
+            border-radius: 12px;
+            border: 2px solid rgba(255, 193, 7, 0.2);
+            background-color: rgba(26, 26, 26, 0.8);
+            color: #ffffff;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        #user-input:focus {
+            outline: none;
+            border-color: #ffc107;
+            box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.1);
+        }
+
+        #user-input::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+        .buttons-container {
+            display: flex;
+            gap: 10px;
+        }
+
+        button, .file-upload-label {
+            width: 45px;
+            height: 45px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            cursor: pointer;
+            background-color: #ffc107;
+            color: #000000;
+            border: none;
+            border-radius: 8px;
+        }
+
+        button:hover, .file-upload-label:hover {
+            background-color: #ffca28;
+        }
+
+        #file-input {
+            display: none;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+            }
+
+            .message {
+                max-width: 85%;
+            }
+
+            button, .file-upload-label {
+                padding: 12px 20px;
+            }
+
+            h1 {
+                font-size: 2rem;
+            }
+        }
+
+        .loading {
+            position: relative;
+        }
+
+        .loading::after {
+            content: '';
+            position: absolute;
+            bottom: -20px;
+            right: 20px;
+            width: 40px;
+            height: 4px;
+            background: rgba(255, 193, 7, 0.5);
+            border-radius: 2px;
+            animation: loadingDots 1.5s infinite;
+        }
+
+        @keyframes loadingDots {
+            0%, 100% { width: 10px; }
+            50% { width: 40px; }
+        }
+        /* Additional styles for file previews */
+        .file-preview {
+            max-width: 300px;
+            margin: 10px 0;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .file-preview img {
+            width: 100%;
+            height: auto;
+        }
+
+        .pdf-preview {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+
+        .pdf-link {
+            color: #ffc107;
+            text-decoration: none;
+        }
+
+        .message.with-file {
+            max-width: 90%;
+        }
+
+        .upload-progress {
+            width: 100%;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+            margin: 5px 0;
+        }
+
+        .upload-progress-bar {
+            height: 100%;
+            background: #ffc107;
+            border-radius: 2px;
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>דיני תעבורה</h1>
+
+        <div id="messages"></div>
+
+        <div class="input-container">
+            <input type="text" id="user-input" placeholder="הקלד שאלה...">
+            <div class="buttons-container">
+                <button onclick="sendMessage()">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+                <label class="file-upload-label" for="file-input">
+                    <i class="fas fa-file-upload"></i>
+                </label>
+                <input type="file" id="file-input" onchange="uploadFile()">
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const userInput = document.getElementById('user-input');
+        const messagesDiv = document.getElementById('messages');
+
+        // שליחת הודעה בעת הקשה על Enter
+        userInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        // פונקציה לשליחת הודעה
+        async function sendMessage() {
+            const message = userInput.value.trim();
+            if (!message) return;
+
+            addMessage(message, 'user');
+            userInput.value = '';
+            
+            const loadingMessage = addMessage('טוען...', 'bot loading');
+
+            try {
+                // שליחה לשרת
+                const response = await axios.post('http://localhost:3000/chatbot', { prompt: message, sessionId: '12345' });
+                loadingMessage.remove();
+                addMessage(response.data.response || 'שגיאה בקבלת תשובה.', 'bot');
+            } catch (error) {
+                console.error('שגיאה בבקשה:', error);
+                loadingMessage.remove();
+                addMessage('שגיאה בהתחברות לשרת.', 'bot');
+            }
+        }
+
+        // פונקציה להוספת הודעה למסך
+        function addMessage(text, type) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+            messageDiv.textContent = `${type === 'user' ? 'אתה: ' : 'בוט: '}${text}`;
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            return messageDiv;
+        }
+
+        // פונקציה להעלאת קובץ
+        function uploadFile() {
+            const fileInput = document.getElementById('file-input');
+            const file = fileInput.files[0];
+
+            if (file) {
+                const formData = new FormData();
+                formData.append('file', file);
+
+                // שליחת הקובץ לשרת
+                axios.post('http://localhost:3000/upload', formData)
+                    .then(response => {
+                        // הצגת תשובת הבוט אחרי העלאת הקובץ
+                        addMessage(response.data.answer || 'שגיאה בהעלאת קובץ.', 'bot');
+                    })
+                    .catch(error => {
+                        console.error('שגיאה בהעלאת הקובץ:', error);
+                    });
+            }
+        }
+
+        // מתודעה שתהיה בעת טעינה
+        window.onload = () => {
+            userInput.focus();
+        };
+    </script>
+</body>
+</html>
